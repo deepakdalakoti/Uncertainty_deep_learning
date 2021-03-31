@@ -64,27 +64,29 @@ class deep_ensemble():
         # NLL loss
         mu, sigma = model(xtrain, training=training)
         var = sigma + 1e-6
-        NLL = tf.math.log(var)*0.5 + 0.5*tf.math.divide(tf.math.square(ytrain-mu),var)  
-        return NLL
+        NLL = tf.zeros([xtrain.shape[0],], dtype = xtrain.dtype)
+        # Add NLL for each component, considering independence
+        for i in range(self.outF):
+            NLL = NLL +   tf.math.log(var[...,i])*0.5 + \
+                    0.5*tf.math.divide(tf.math.square(ytrain[...,i]-mu[...,i]),var[...,i])  
+        return tf.reduce_mean(NLL,axis=-1)
     def loss_class(self, model, xtrain, ytrain, training):
         # 
         ypred = model(xtrain, training=training)
         loss_fn = tf.keras.losses.CategoricalCrossentropy()
         return loss_fn(ytrain, ypred)
-
     def train_step_regression(self, model, xtrain, ytrain):
         with tf.GradientTape() as tape:
             loss = self.loss_fn(model,xtrain, ytrain, True)
         grad = tape.gradient(loss, model.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, model.trainable_variables))
-        return self.optimizer.iterations.numpy(), loss.numpy()
-
+        return loss
     def train_step_classification(self, model, xtrain, ytrain):
         with tf.GradientTape() as tape:
             loss = self.loss_fn(model, xtrain, ytrain, True)
         grad = tape.gradient(loss, model.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, model.trainable_variables))
-        return self.optimizer.iterations.numpy(), loss.numpy()
+        return loss
 
     def train(self, model, batch_size, epochs, xtrain, ytrain, validation_data=None):
         train_dataset = tf.data.Dataset.from_tensor_slices((xtrain, ytrain))
@@ -95,9 +97,9 @@ class deep_ensemble():
         for i in range(epochs):
             epoch_loss_avg = tf.keras.metrics.Mean()
             for x, y in train_dataset:
-                step, loss = self.train_step(model, xtrain, ytrain)
+                loss = self.train_step(model, x, y)
                 epoch_loss_avg.update_state(loss)
-            train_loss.append(epoch_loss_avg.result())
+            train_loss.append(epoch_loss_avg.result().numpy())
             if(validation_data):
                 valid_loss.append(np.mean(self.loss_fn(model, validation_data[0], validation_data[1], False).numpy()))
                 print("Step {} loss {} valid_loss {}".format(i, epoch_loss_avg.result(), valid_loss[i]))

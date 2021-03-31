@@ -3,3 +3,6 @@
 - MC dropout
 - Bayesian neural network using variational inference
 - deep ensemble learning
+
+
+### To Do : Make graph execution compatible
