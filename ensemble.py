@@ -118,23 +118,25 @@ class deep_ensemble():
         return hist, hist_valid
 
     def pred_regression(self, xdata, y, norm):
-        pred_all = np.zeros([len(self.models),xdata.shape[0], 2])
+        pred_all = np.zeros([len(self.models),xdata.shape[0], 2*self.outF])
         for i in range(len(self.models)):
             mu, sigma = self.models[i](xdata)
-            pred_all[i,:,:]  = np.array([mu, sigma]).T
+            pred_all[i,:,0:self.outF]  = mu
+            pred_all[i,:,self.outF:]  = sigma
+
 
         # Mean, std as in paper
-        pred_mean = np.mean(pred_all[:,:,0],axis=0)
-        pred_std = np.sqrt(np.mean(pred_all[:,:,0]**2 + pred_all[:,:,1]+1e-6,axis=0) - pred_mean**2 )
+        pred_mean = np.mean(pred_all[:,:,0:self.outF],axis=0)
+        pred_std = np.sqrt(np.mean(pred_all[:,:,0:self.outF]**2 + pred_all[:,:,self.outF:]+1e-6,axis=0) - pred_mean**2 )
         pred_mean = do_inverse_norm(y, pred_mean, norm)
         pred_std = pred_std*np.std(y)
          
         return pred_all, pred_mean, pred_std
 
     def pred_classification(self, xdata, y, norm):
-        pred_all = np.zeros([len(self.models),xdata.shape[0]])
+        pred_all = np.zeros([len(self.models),xdata.shape[0], self.outF])
         for i in range(len(self.models)):
-            pred_all[i,:] = self.models[i](xdata)
+            pred_all[i,:,:] = self.models[i](xdata)
 
         pred_all = do_inverse_norm(y, pred_all, norm)
         # Mean, std as in paper
