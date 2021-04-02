@@ -4,5 +4,8 @@
 - Bayesian neural network using variational inference
 - deep ensemble learning
 
+For usage, see example.py
+
+![example][./example.png]
 
 ### To Do : Make graph execution compatible
