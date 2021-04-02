@@ -46,7 +46,7 @@ if __name__ == '__main__':
     
     print(mean_ensemble.shape, mean_MC.shape, mean_BNN.shape)
     # Plot
-    plt.figure(figsize=(15,10))
+    plt.figure(figsize=(10,6))
     plt.subplot(1,3,1)
     plt.plot(xtest, mean_ensemble,'r')
     plt.fill_between(xtest, mean_ensemble[:,0]-3*std_ensemble[:,0], mean_ensemble[:,0] + 3*std_ensemble[:,0])
