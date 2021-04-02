@@ -64,7 +64,7 @@ class deep_ensemble():
         # NLL loss
         mu, sigma = model(xtrain, training=training)
         var = sigma + 1e-6
-        NLL = tf.zeros([xtrain.shape[0],], dtype = xtrain.dtype)
+        NLL = tf.zeros([xtrain.shape[0],], dtype = tf.float32)
         # Add NLL for each component, considering independence
         for i in range(self.outF):
             NLL = NLL +   tf.math.log(var[...,i])*0.5 + \
@@ -89,7 +89,7 @@ class deep_ensemble():
         return loss
 
     def train(self, model, batch_size, epochs, xtrain, ytrain, validation_data=None):
-        train_dataset = tf.data.Dataset.from_tensor_slices((xtrain, ytrain))
+        train_dataset = tf.data.Dataset.from_tensor_slices((xtrain.astype(np.float32), ytrain.astype(np.float32)))
         train_dataset = train_dataset.shuffle(buffer_size=xtrain.shape[0], reshuffle_each_iteration=True).batch(batch_size)
         self.optimizer = tf.keras.optimizers.Adam(self.lr, beta_1=0.9, beta_2=0.999)
         train_loss = []
