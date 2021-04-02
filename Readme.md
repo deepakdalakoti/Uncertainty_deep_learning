@@ -6,6 +6,6 @@
 
 For usage, see example.py
 
-![example][./example.png]
+![example](./example.png)
 
 ### To Do : Make graph execution compatible
