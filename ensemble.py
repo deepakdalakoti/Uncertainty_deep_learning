@@ -6,6 +6,9 @@ from tensorflow.keras.layers import Input, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from util import do_inverse_norm
 
+# Set default type for compatibility between CPU/GPU
+tf.keras.backend.set_floatx('float32')
+
 class deep_ensemble():
 
     def __init__(self, inF, outF, H, lr=1e-4,  problem='regression'):
@@ -92,6 +95,10 @@ class deep_ensemble():
         train_dataset = tf.data.Dataset.from_tensor_slices((xtrain.astype(np.float32), ytrain.astype(np.float32)))
         train_dataset = train_dataset.shuffle(buffer_size=xtrain.shape[0], reshuffle_each_iteration=True).batch(batch_size)
         self.optimizer = tf.keras.optimizers.Adam(self.lr, beta_1=0.9, beta_2=0.999)
+        if(validation_data):
+            validation_data[0] = validation_data[0].astype(np.float32)
+            validation_data[1] = validation_data[1].astype(np.float32)
+
         train_loss = []
         valid_loss = []
         for i in range(epochs):
