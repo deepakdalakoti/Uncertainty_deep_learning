@@ -7,6 +7,8 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLRO
 from util import do_inverse_norm
 import tensorflow_probability as tfp
 
+tf.keras.backend.set_floatx('float32')
+
 class Bayesian_net():
 
     def __init__(self, inF, outF, H, lr=1e-4,  problem='regression'):
@@ -69,6 +71,7 @@ class Bayesian_net():
         NLL = tf.math.log(var)*0.5 + 0.5*tf.math.divide(tf.math.square(ytrain-mu),var)  
         total_loss = NLL + kl_weight*sum(model.losses)
         return total_loss
+
     def loss_class(self, model, xtrain, ytrain, kl_weight, training):
         # 
         ypred = model(xtrain, training=training)
@@ -76,23 +79,25 @@ class Bayesian_net():
         total_loss = loss_fn(ytrain, ypred) + kl_weight*sum(model.losses)
         return total_loss
 
+    @tf.function
     def train_step_regression(self, model, xtrain, ytrain, kl_weight):
         with tf.GradientTape() as tape:
             loss = self.loss_fn(model,xtrain, ytrain, kl_weight, True)
         grad = tape.gradient(loss, model.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, model.trainable_variables))
-        return self.optimizer.iterations.numpy(), loss.numpy()
+        return  loss
 
+    @tf.function
     def train_step_classification(self, model, xtrain, ytrain, kl_weight):
         with tf.GradientTape() as tape:
             loss = self.loss_fn(model, xtrain, ytrain, kl_weight, True)
         grad = tape.gradient(loss, model.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, model.trainable_variables))
-        return self.optimizer.iterations.numpy(), loss.numpy()
+        return loss
 
     def train(self, batch_size, epochs, xtrain, ytrain, kl_weight=1e-3, validation_data=None):
         self.model = self.model_fn()
-        train_dataset = tf.data.Dataset.from_tensor_slices((xtrain, ytrain))
+        train_dataset = tf.data.Dataset.from_tensor_slices((xtrain.astype(np.float32), ytrain.astype(np.float32)))
         train_dataset = train_dataset.shuffle(buffer_size=xtrain.shape[0], reshuffle_each_iteration=True).batch(batch_size)
         self.optimizer = tf.keras.optimizers.Adam(self.lr, beta_1=0.9, beta_2=0.999)
         train_loss = []
@@ -100,7 +105,7 @@ class Bayesian_net():
         for i in range(epochs):
             epoch_loss_avg = tf.keras.metrics.Mean()
             for x, y in train_dataset:
-                step, loss = self.train_step(self.model, xtrain, ytrain, kl_weight)
+                loss = self.train_step(self.model, x, y, kl_weight)
                 epoch_loss_avg.update_state(loss)
             train_loss.append(epoch_loss_avg.result().numpy())
             if(validation_data):

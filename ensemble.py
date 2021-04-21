@@ -104,6 +104,7 @@ class deep_ensemble():
         train_dataset = tf.data.Dataset.from_tensor_slices((xtrain.astype(np.float32), ytrain.astype(np.float32)))
         train_dataset = train_dataset.shuffle(buffer_size=xtrain.shape[0], reshuffle_each_iteration=True).batch(batch_size)
         self.optimizer = tf.keras.optimizers.Adam(self.lr, beta_1=0.9, beta_2=0.999)
+        #self.optimizer = tf.keras.optimizers.RMSprop(self.lr)
         grad_vars = model.trainable_weights
         zero_grads = [tf.zeros_like(w) for w in grad_vars]
         self.optimizer.apply_gradients(zip(zero_grads, grad_vars)) 

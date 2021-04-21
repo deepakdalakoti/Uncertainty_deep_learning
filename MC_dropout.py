@@ -58,16 +58,17 @@ class MC_dropout():
         ypred = model(xtrain, training=training)
         return self.loss_fn(ytrain, ypred)
 
+    @tf.function
     def train_step(self, model, xtrain, ytrain):
         with tf.GradientTape() as tape:
             loss = self.loss(model,xtrain, ytrain, True)
         grad = tape.gradient(loss, model.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, model.trainable_variables))
-        return self.optimizer.iterations.numpy(), loss.numpy()
+        return loss
 
     def train(self, batch_size, epochs, xtrain, ytrain, validation_data=None):
         self.model = self.model_fn()
-        train_dataset = tf.data.Dataset.from_tensor_slices((xtrain, ytrain))
+        train_dataset = tf.data.Dataset.from_tensor_slices((xtrain.astype(np.float32), ytrain.astype(np.float32)))
         train_dataset = train_dataset.shuffle(buffer_size=xtrain.shape[0], reshuffle_each_iteration=True).batch(batch_size)
         self.optimizer = tf.keras.optimizers.Adam(self.lr, beta_1=0.9, beta_2=0.999)
         train_loss = []
@@ -75,9 +76,9 @@ class MC_dropout():
         for i in range(epochs):
             epoch_loss_avg = tf.keras.metrics.Mean()
             for x, y in train_dataset:
-                step, loss = self.train_step(self.model, xtrain, ytrain)
+                loss = self.train_step(self.model, x, y)
                 epoch_loss_avg.update_state(loss)
-            train_loss.append(epoch_loss_avg.result().numpy())
+            train_loss.append(epoch_loss_avg.result())
             if(validation_data):
                 valid_loss.append(np.mean(self.loss_fn(self.model, validation_data[0], validation_data[1], True).numpy()))
                 print("Step {} loss {} valid_loss {}".format(i, epoch_loss_avg.result(), valid_loss[i]))
