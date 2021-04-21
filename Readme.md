@@ -8,4 +8,4 @@ For usage, see example.py
 
 ![example](./example.png)
 
-### To Do : Make graph execution compatible
+## To Do : Make Bayesian NN for multiple output
