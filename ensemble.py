@@ -8,10 +8,11 @@ from util import do_inverse_norm
 
 # Set default type for compatibility between CPU/GPU
 tf.keras.backend.set_floatx('float32')
+#tf.config.run_functions_eagerly(True)
 
 class deep_ensemble():
 
-    def __init__(self, inF, outF, H, lr=1e-4,  problem='regression'):
+    def __init__(self, inF, outF, H, lr=1e-4, Nmodels=5, problem='regression'):
         self.inF= inF
         self.outF = outF
         self.H = H
@@ -26,6 +27,11 @@ class deep_ensemble():
             self.train_step = self.train_step_classification
             self.pred = self.pred_classification
             self.loss_fn = self.loss_class
+
+        self.models = []
+        self.Nmodels = Nmodels
+        for i in range(Nmodels):
+            self.models.append(self.model_fn())
         return
 
 
@@ -40,6 +46,7 @@ class deep_ensemble():
         mu = Dense(self.outF, activation='linear', kernel_initializer=init)(x)
         sigma = Dense(self.outF, activation='softplus', kernel_initializer=init)(x)
         model = keras.Model(inputs=inputs, outputs=[mu, sigma])
+        model.build(input_shape=(self.inF))
         return model
 
     def base_model_classification(self):
@@ -52,7 +59,6 @@ class deep_ensemble():
         x = Dense(self.H, activation=tf.nn.relu, kernel_initializer=init)(x)
         x = Dense(self.outF, activation='softmax', kernel_initializer=init)(x)
         model = keras.Model(inputs=inputs, outputs=x)
-
         return model
 
 
@@ -62,7 +68,7 @@ class deep_ensemble():
             self.models.append(self.model_fn())
 
         return
-
+    @tf.function
     def loss_reg(self, model, xtrain, ytrain, training):
         # NLL loss
         mu, sigma = model(xtrain, training=training)
@@ -73,17 +79,20 @@ class deep_ensemble():
             NLL = NLL +   tf.math.log(var[...,i])*0.5 + \
                     0.5*tf.math.divide(tf.math.square(ytrain[...,i]-mu[...,i]),var[...,i])  
         return tf.reduce_mean(NLL,axis=-1)
+    @tf.function
     def loss_class(self, model, xtrain, ytrain, training):
         # 
         ypred = model(xtrain, training=training)
         loss_fn = tf.keras.losses.CategoricalCrossentropy()
         return loss_fn(ytrain, ypred)
+    @tf.function
     def train_step_regression(self, model, xtrain, ytrain):
         with tf.GradientTape() as tape:
             loss = self.loss_fn(model,xtrain, ytrain, True)
         grad = tape.gradient(loss, model.trainable_variables)
         self.optimizer.apply_gradients(zip(grad, model.trainable_variables))
         return loss
+    @tf.function
     def train_step_classification(self, model, xtrain, ytrain):
         with tf.GradientTape() as tape:
             loss = self.loss_fn(model, xtrain, ytrain, True)
@@ -95,6 +104,10 @@ class deep_ensemble():
         train_dataset = tf.data.Dataset.from_tensor_slices((xtrain.astype(np.float32), ytrain.astype(np.float32)))
         train_dataset = train_dataset.shuffle(buffer_size=xtrain.shape[0], reshuffle_each_iteration=True).batch(batch_size)
         self.optimizer = tf.keras.optimizers.Adam(self.lr, beta_1=0.9, beta_2=0.999)
+        grad_vars = model.trainable_weights
+        zero_grads = [tf.zeros_like(w) for w in grad_vars]
+        self.optimizer.apply_gradients(zip(zero_grads, grad_vars)) 
+         
         if(validation_data):
             validation_data[0] = validation_data[0].astype(np.float32)
             validation_data[1] = validation_data[1].astype(np.float32)
@@ -115,12 +128,12 @@ class deep_ensemble():
 
         return train_loss, valid_loss
 
-    def train_ensemble(self, N, xtrain, ytrain, epochs, batch_size, validation_data=None):
-        self.models = []
+    def train_ensemble(self, xtrain, ytrain, epochs, batch_size, validation_data=None):
+        #self.models = []
         hist = []
         hist_valid = []
-        for i in range(N):
-            self.models.append(self.model_fn())
+        for i in range(self.Nmodels):
+            #self.models.append(self.model_fn())
             h1, h2 = self.train(self.models[i], batch_size, epochs, xtrain, ytrain, validation_data)
             hist.append(h1)
             hist_valid.append(h2)

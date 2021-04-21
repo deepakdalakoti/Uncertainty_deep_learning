@@ -3,7 +3,6 @@ from ensemble import deep_ensemble
 from MC_dropout import MC_dropout
 from Bayesian_NN import Bayesian_net 
 from util import do_normalization
-
 import matplotlib.pyplot as plt
 
 def get_toy_dataset(Npts):
@@ -27,10 +26,9 @@ if __name__ == '__main__':
     yN = yN.reshape(-1,1)
     xtestN = xtestN.reshape(-1,1)
     # deep ensemble
-    ensemble = deep_ensemble(1,1,10, 5e-3)
-    hist, _ = ensemble.train_ensemble(5, xN, yN, 200, 32)
+    ensemble = deep_ensemble(1,1,10, 5e-3, 5)
+    hist, _ = ensemble.train_ensemble(xN, yN, 200, 32)
     _, mean_ensemble, std_ensemble = ensemble.predict(xtestN, y, 'std')
-
 
     # MC dropout
 
