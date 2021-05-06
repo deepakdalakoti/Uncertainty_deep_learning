@@ -1,4 +1,34 @@
 import numpy as np
+from tensorflow.python.keras import backend as K
+
+
+class ReduceLROnPlateau():
+    def __init__(self, optim, factor=0.1, patience=10, min_lr=1e-6):
+
+        self.best = 1e20
+        self.wait=0
+        self.patience=patience
+        self.min_lr = min_lr
+        self.factor = factor
+        self.optim = optim
+        
+    def on_epoch_end(self, loss, epoch):
+        if(self.best > loss):
+            self.wait=0
+            self.best = loss
+        else:
+            self.wait = self.wait+1
+            
+            cur_lr = K.get_value(self.optim.lr)
+            if(cur_lr > self.min_lr):
+                if(self.wait > self.patience):
+                    self.wait=0
+                    new_lr = cur_lr*self.factor
+                    new_lr = max(new_lr, self.min_lr)
+                    K.set_value(self.optim.lr, new_lr)
+                    
+                    print("Epoch {}: ReduceLROnPlateau reducing learning rate to {}".format(epoch, new_lr))
+        return
 
 def do_normalization(data,data2,which):
     if(which=='range'):

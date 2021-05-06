@@ -108,25 +108,28 @@ class deep_ensemble():
         grad_vars = model.trainable_weights
         zero_grads = [tf.zeros_like(w) for w in grad_vars]
         self.optimizer.apply_gradients(zip(zero_grads, grad_vars)) 
-         
+        red_lr = ReduceLROnPlateau(self.optimizer, 0.8, 10, 1e-5)
+
         if(validation_data):
             validation_data[0] = validation_data[0].astype(np.float32)
             validation_data[1] = validation_data[1].astype(np.float32)
 
         train_loss = []
         valid_loss = []
+        epoch_loss_avg = tf.keras.metrics.Mean()
         for i in range(epochs):
-            epoch_loss_avg = tf.keras.metrics.Mean()
+            epoch_loss_avg.reset_states()
             for x, y in train_dataset:
                 loss = self.train_step(model, x, y)
                 epoch_loss_avg.update_state(loss)
             train_loss.append(epoch_loss_avg.result().numpy())
+            red_lr.on_epoch_end(train_loss[-1], i)
             if(validation_data):
                 valid_loss.append(np.mean(self.loss_fn(model, validation_data[0], validation_data[1], False).numpy()))
                 print("Step {} loss {} valid_loss {}".format(i, epoch_loss_avg.result(), valid_loss[i]))
             else:
                 print("Step {} loss {}".format(i, epoch_loss_avg.result()))
-
+        
         return train_loss, valid_loss
 
     def train_ensemble(self, xtrain, ytrain, epochs, batch_size, validation_data=None):
