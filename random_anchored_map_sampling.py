@@ -85,7 +85,7 @@ class deep_ensemble():
         x = Dense(self.H, activation=tf.nn.relu, kernel_initializer=init)(inputs)
         x = Dense(self.H, activation=tf.nn.relu, kernel_initializer=init)(x)
         x = Dense(self.H, activation=tf.nn.relu, kernel_initializer=init)(x)
-        x = Dense(self.outF, activation='softmax', kernel_initializer=init)(x)
+        x = Dense(self.outF, activation='sigmoid', kernel_initializer=init)(x)
         model = keras.Model(inputs=inputs, outputs=x)
         return model
 
@@ -96,21 +96,8 @@ class deep_ensemble():
             self.models.append(self.model_fn())
 
         return
-    @tf.function
-    def loss_reg(self, model, xtrain, ytrain, training):
-        # NLL loss
-        #mu, sigma = model(xtrain, training=training)
-        #var = sigma + 1e-6
-        #NLL = tf.zeros([xtrain.shape[0],], dtype = tf.float32)
-        # Add NLL for each component, considering independence
-        #for i in range(self.outF):
-        #    NLL = NLL +   tf.math.log(var[...,i])*0.5 + \
-        #            0.5*tf.math.divide(tf.math.square(ytrain[...,i]-mu[...,i]),var[...,i])  
-        #return tf.reduce_mean(NLL,axis=-1)
 
-        loss = tf.keras.losses.MSE(ytrain, model(xtrain, training=training))
-        return loss
-    def loss_reg2(self, model, xtrain, ytrain, indx, training):
+    def loss_reg(self, model, xtrain, ytrain, indx, training):
         #mse_loss = tf.keras.losses.MSE(ytrain, model(xtrain, training=training))
         ypred = model(xtrain, training=training)
         mse_loss = tf.reduce_mean(tf.math.square(ytrain - ypred))
@@ -125,26 +112,33 @@ class deep_ensemble():
 
 
     @tf.function
-    def loss_class(self, model, xtrain, ytrain, training):
+    def loss_class(self, model, xtrain, ytrain, indx, training):
         # 
         ypred = model(xtrain, training=training)
-        loss_fn = tf.keras.losses.CategoricalCrossentropy()
-        return loss_fn(ytrain, ypred)
+        loss_fn = tf.keras.losses.BinaryCrossentropy()
+        entrp_loss = loss_fn(ytrain, ypred)
+        anchor_loss=0
+        i=0
+        for wghts in model.trainable_weights:
+            if('kernel' in wghts.name):
+                anchor_loss = anchor_loss + tf.reduce_mean(tf.math.square(self.init_wghts[indx][i] - wghts))*self.lambda_anchor[i]
+                i=i+1
+        return entrp_loss + anchor_loss, entrp_loss, anchor_loss
     @tf.function
     def train_step_regression(self, model, xtrain, ytrain, optimizer, indx):
         with tf.GradientTape() as tape:
-            total_loss, mse_loss, anchor_loss  = self.loss_reg2(model,xtrain, ytrain, indx, True)
+            total_loss, mse_loss, anchor_loss  = self.loss_fn(model,xtrain, ytrain, indx, True)
             #loss = tf.keras.losses.mse(ytrain,model(xtrain))
         grad = tape.gradient(total_loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grad, model.trainable_variables))
         return total_loss, mse_loss, anchor_loss
     @tf.function
-    def train_step_classification(self, model, xtrain, ytrain, optimizer):
+    def train_step_classification(self, model, xtrain, ytrain, optimizer, indx):
         with tf.GradientTape() as tape:
-            loss = self.loss_fn(model, xtrain, ytrain, True)
-        grad = tape.gradient(loss, model.trainable_variables)
+            total_loss, entrp_loss, anchor_loss = self.loss_fn(model, xtrain, ytrain, indx,  True)
+        grad = tape.gradient(total_loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grad, model.trainable_variables))
-        return loss
+        return total_loss, entrp_loss, anchor_loss
 
     def train(self, model, batch_size, epochs, xtrain, ytrain, indx, validation_data=None):
         train_dataset = tf.data.Dataset.from_tensor_slices((xtrain.astype(np.float32), ytrain.astype(np.float32)))
