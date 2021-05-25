@@ -2,7 +2,7 @@ import numpy as np
 from torch.autograd import Variable
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.layers import Input, Dense, Dropout, BatchNormalization
+from tensorflow.keras.layers import Input, Dense, Dropout, BatchNormalization, PReLU
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from util import do_inverse_norm, ReduceLROnPlateau
 
@@ -12,7 +12,7 @@ tf.keras.backend.set_floatx('float32')
 
 class deep_ensemble():
 
-    def __init__(self, inF, outF, H, lr=1e-4, Nmodels=5, problem='regression'):
+    def __init__(self, inF, outF, H, lr=1e-4, Nmodels=5, problem='regression', epsilon=1e-3):
         self.inF= inF
         self.outF = outF
         self.H = H
@@ -43,7 +43,7 @@ class deep_ensemble():
         self.lambda_anchor = []
         # variance of noise in data (aleatoric uncertainty)
         # for present case should be small
-        epsilon = 1e-2
+        self.epsilon = epsilon
         for i in range(Nmodels):
             wght_list = []
             for wghts in self.models[i].trainable_weights:
@@ -58,20 +58,23 @@ class deep_ensemble():
 
     def base_model_regression(self):
 
-        #init = tf.keras.initializers.glorot_normal()
-        def _kernel_init(scale=1.0, seed=None):
-            """He normal initializer with scale."""
-            scale = 2. * scale
-            return tf.keras.initializers.VarianceScaling(
-            scale=scale, mode='fan_in', distribution="truncated_normal", seed=seed)
-        init = _kernel_init(scale=0.1)
+        init = tf.keras.initializers.glorot_normal()
+        #def _kernel_init(scale=1.0, seed=None):
+        #    """He normal initializer with scale."""
+        #    scale = 2. * scale
+        #    return tf.keras.initializers.VarianceScaling(
+        #    scale=scale, mode='fan_in', distribution="truncated_normal", seed=seed)
+        #init = _kernel_init(scale=0.1)
         inputs = Input(shape=(self.inF,))
         x = Dense(self.H, kernel_initializer=init)(inputs)
-        x = tf.nn.relu(x)
+        x = BatchNormalization()(x)
+        x = PReLU()(x)
         x = Dense(self.H, kernel_initializer=init)(x)
-        x = tf.nn.relu(x)
+        x = BatchNormalization()(x)
+        x = PReLU()(x)
         x = Dense(self.H, kernel_initializer=init)(x)
-        x = tf.nn.relu(x)
+        x = BatchNormalization()(x)
+        x = PReLU()(x)
         x = Dense(self.outF, kernel_initializer=init)(x)
         model = keras.Model(inputs=inputs, outputs=x)
         model.build(input_shape=(self.inF))
