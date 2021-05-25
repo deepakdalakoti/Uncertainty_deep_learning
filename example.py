@@ -1,5 +1,6 @@
 import numpy as np
-from ensemble import deep_ensemble
+#from ensemble import deep_ensemble
+from random_anchored_map_sampling import deep_ensemble
 from MC_dropout import MC_dropout
 from Bayesian_NN import Bayesian_net 
 from util import do_normalization
@@ -34,13 +35,13 @@ if __name__ == '__main__':
 
     MC = MC_dropout(1,1,10, 0.1, 5e-3)
     hist, _ = MC.train(32, 200, xN, yN)
-    _, mean_MC, std_MC = MC.predict(xtestN, y, 'std', 20)
+    _, mean_MC, std_MC = MC.predict(xtestN, y, 'std', 40)
 
     # Bayesian NN
 
     BNN = Bayesian_net(1,1,10,5e-3)
-    hist, _ = BNN.train(32, 200, xN, yN)
-    _, mean_BNN, std_BNN = BNN.predict(xtestN, y, 'std', 20)
+    hist, _ = BNN.train(32, 200, xN, yN, kl_weight=1e-6)
+    _, mean_BNN, std_BNN = BNN.predict(xtestN, y, 'std', 40)
     
     print(mean_ensemble.shape, mean_MC.shape, mean_BNN.shape)
     # Plot
@@ -54,13 +55,13 @@ if __name__ == '__main__':
 
     plt.subplot(1,3,2)
     plt.plot(xtest, mean_MC,'r')
-    plt.fill_between(xtest, mean_MC-3*std_MC, mean_MC + 3*std_MC)
+    plt.fill_between(xtest, mean_MC[:,0]-3*std_MC[:,0], mean_MC[:,0] + 3*std_MC[:,0])
     plt.scatter(x, y)
     plt.title('MC Dropout')
 
     plt.subplot(1,3,3)
     plt.plot(xtest, mean_BNN, 'r')
-    plt.fill_between(xtest, mean_BNN-3*std_BNN, mean_BNN + 3*std_BNN)
+    plt.fill_between(xtest, mean_BNN[:,0]-3*std_BNN[:,0], mean_BNN[:,0] + 3*std_BNN[:,0])
     plt.scatter(x, y)
     plt.title('Bayesian')
     plt.tight_layout()
